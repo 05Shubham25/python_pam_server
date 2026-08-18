@@ -1,0 +1,84 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-abyss text-ink-primary antialiased;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+::selection {
+  @apply bg-accent/30 text-white;
+}
+
+/* ---- scrollbars ---- */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #1a3350 transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: #1a3350;
+  border-radius: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@layer components {
+  .label-xs {
+    @apply text-[11px] font-medium uppercase tracking-[0.1em] text-ink-secondary;
+  }
+
+  .panel {
+    @apply rounded-xl border border-border bg-ocean;
+  }
+
+  .input-dark {
+    @apply w-full rounded-lg border border-border bg-abyss/60 px-3.5 py-2.5 text-sm text-ink-primary placeholder:text-ink-secondary/50 outline-none transition-all duration-200;
+  }
+  .input-dark:focus {
+    @apply border-accent/70;
+    box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15), 0 0 18px rgba(14, 165, 233, 0.12);
+  }
+
+  .btn-shimmer {
+    position: relative;
+    overflow: hidden;
+  }
+  .btn-shimmer::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.12),
+      transparent
+    );
+    transition: transform 0.5s ease;
+  }
+  .btn-shimmer:hover::after {
+    transform: translateX(100%);
+  }
+
+  .skeleton-row {
+    @apply rounded-md;
+    background: linear-gradient(90deg, #0d1a2c 25%, #13253c 50%, #0d1a2c 75%);
+    background-size: 800px 100%;
+    @apply animate-skeleton;
+  }
+}
+
+/* xterm overrides */
+.xterm .xterm-viewport {
+  background-color: transparent !important;
+}

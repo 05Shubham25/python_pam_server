@@ -1,0 +1,8 @@
+fastapi==0.109.2
+uvicorn[standard]==0.27.1
+pydantic==2.6.1
+pydantic-settings==2.2.1
+sqlalchemy[asyncio]==2.0.27
+asyncpg==0.29.0       # Async PostgreSQL driver
+redis==5.0.1          # Includes async support
+python-dotenv==1.0.1

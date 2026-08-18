@@ -1,0 +1,14 @@
+# Core (terminal sessions) — required
+websockets>=12.0
+
+# Desktop access (screen capture + input injection) — optional
+mss>=9.0
+Pillow>=10.0
+pynput>=1.7.6
+
+# Wayland desktop capture — optional (Linux only; also needs system packages,
+# see README "Wayland desktop capture"): python3-gi + GStreamer + dbus-next
+dbus-next>=0.2.3
+
+# Optional: true PTY on Windows (falls back to pipes without it)
+# pywinpty>=2.4

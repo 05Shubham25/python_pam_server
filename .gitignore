@@ -1,0 +1,131 @@
+# =============================================================================
+# Python / FastAPI Backend
+# =============================================================================
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environment (local env/ folder)
+env/
+venv/
+.venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Distribution / packaging
+.eggs/
+*.egg
+*.egg-info/
+dist/
+build/
+wheels/
+sdist/
+develop-eggs/
+lib/
+lib64/
+parts/
+var/
+.installed.cfg
+MANIFEST
+
+# Unit test / coverage
+.pytest_cache/
+.tox/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+nosetests.xml
+*.log
+
+# Type checkers
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pytype/
+.pyre/
+
+# Alembic (keep versions, ignore generated cache)
+alembic/__pycache__/
+
+# =============================================================================
+# Environment & Secrets
+# =============================================================================
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets.json
+
+# =============================================================================
+# Agent
+# =============================================================================
+agent/__pycache__/
+agent.zip
+
+# =============================================================================
+# Next.js / Frontend
+# =============================================================================
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/node_modules/
+frontend/.npm
+frontend/.eslintcache
+frontend/tsconfig.tsbuildinfo
+frontend/next-env.d.ts
+
+# Vercel
+frontend/.vercel
+
+# =============================================================================
+# Node / npm (general)
+# =============================================================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnp/
+.pnp.js
+.yarn/install-state.gz
+
+# =============================================================================
+# IDE / Editor
+# =============================================================================
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.swp
+*~
+
+# =============================================================================
+# OS
+# =============================================================================
+.DS_Store
+Thumbs.db
+desktop.ini
+ehthumbs.db
+
+# =============================================================================
+# Docker
+# =============================================================================
+*.env.docker
+
+# =============================================================================
+# Misc
+# =============================================================================
+*.zip
+*.tar.gz
+*.rar
+code.txt
