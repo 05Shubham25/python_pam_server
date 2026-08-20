@@ -84,6 +84,7 @@ func (w *DesktopWorker) Run() {
 	}()
 
 	if err := w.capture.Probe(); err != nil {
+		log.Printf("session %s desktop probe error:\n%v", w.session.ID, err)
 		w.sendCtrl(map[string]any{"t": "bye", "reason": err.Error()})
 		w.ws.Close()
 		return

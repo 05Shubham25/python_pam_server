@@ -54,6 +54,10 @@ func (a *Agent) Run() {
 	log.Printf("pam_agent v%s | agent %s -> %s (terminal=%v desktop=%v)",
 		AgentVersion, a.cfg.AgentID, a.cfg.Server, !a.cfg.NoTerminal, !a.cfg.NoDesktop)
 
+	if !a.cfg.NoDesktop {
+		checkStartupDependencies()
+	}
+
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 	go func() {

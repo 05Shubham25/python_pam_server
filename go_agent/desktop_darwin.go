@@ -16,6 +16,8 @@ func NewDesktopBackends(monitor, quality int) (CaptureBackend, InputBackend, err
 	return &screencaptureBackend{quality: clampQuality(quality)}, &cliclickInput{}, nil
 }
 
+func checkStartupDependencies() {}
+
 // screencaptureBackend uses the built-in `screencapture` CLI, which writes
 // to a file (no stdout mode), so frames go through a temp file.
 type screencaptureBackend struct {

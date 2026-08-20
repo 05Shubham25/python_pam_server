@@ -17,6 +17,8 @@ func NewDesktopBackends(monitor, quality int) (CaptureBackend, InputBackend, err
 	return &gdiCapture{quality: clampQuality(quality)}, &winInput{}, nil
 }
 
+func checkStartupDependencies() {}
+
 var (
 	user32          = syscall.NewLazyDLL("user32.dll")
 	gdi32           = syscall.NewLazyDLL("gdi32.dll")

@@ -8,6 +8,7 @@ import (
 	"image"
 	_ "image/jpeg"
 	"log"
+	"os"
 	"os/exec"
 )
 
@@ -15,33 +16,50 @@ func NewDesktopBackends(monitor, quality int) (CaptureBackend, InputBackend, err
 	return &execCapture{quality: clampQuality(quality)}, &xdotoolInput{}, nil
 }
 
+func checkStartupDependencies() {
+	c := &execCapture{quality: 50}
+	if err := c.Probe(); err != nil {
+		fmt.Printf("\n======================================================================\n")
+		fmt.Printf("[WARNING] Missing Linux Remote Desktop dependencies!\n\n")
+		fmt.Printf("To enable Desktop streaming & mouse control, run this command:\n\n")
+		fmt.Printf("  sudo apt-get update && sudo apt-get install -y gnome-screenshot xdotool\n\n")
+		fmt.Printf("======================================================================\n\n")
+	}
+}
+
 // execCapture captures JPEG frames via external tools:
 //   - grim  : wlroots Wayland (sway / Hyprland / river), wlr-screencopy
 //   - import: X11 / XWayland (ImageMagick)
-// Both write JPEG straight to stdout, so frames pass through unencoded.
+//   - scrot : X11 fallback
 type execCapture struct {
 	quality   int
-	tool      string // "grim" | "import"
+	tool      string // "grim" | "import" | "scrot"
 	width     int
 	height    int
 	lastFrame []byte
 }
 
-func clampQuality(q int) int {
-	if q < 30 {
-		return 30
+func ensureX11Env() {
+	if os.Getenv("DISPLAY") == "" {
+		_ = os.Setenv("DISPLAY", ":0")
 	}
-	if q > 90 {
-		return 90
+	if os.Getenv("XAUTHORITY") == "" {
+		if sudoUser := os.Getenv("SUDO_USER"); sudoUser != "" {
+			_ = os.Setenv("XAUTHORITY", fmt.Sprintf("/home/%s/.Xauthority", sudoUser))
+		}
 	}
-	return q
 }
 
 func runTool(tool string, quality int) ([]byte, error) {
+	ensureX11Env()
 	var cmd *exec.Cmd
 	q := fmt.Sprintf("%d", quality)
-	if tool == "grim" {
+	if tool == "gnome-screenshot" {
+		cmd = exec.Command("gnome-screenshot", "-f", "/tmp/pam_frame.jpg")
+	} else if tool == "grim" {
 		cmd = exec.Command("grim", "-t", "jpeg", "-q", q, "-")
+	} else if tool == "scrot" {
+		cmd = exec.Command("scrot", "-q", q, "-o", "/tmp/pam_frame.jpg")
 	} else {
 		cmd = exec.Command("import", "-window", "root", "-quality", q, "jpeg:-")
 	}
@@ -49,7 +67,12 @@ func runTool(tool string, quality int) ([]byte, error) {
 	cmd.Stdout = &out
 	cmd.Stderr = &errOut
 	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("%s failed: %v: %s", tool, err, errOut.String())
+		return nil, fmt.Errorf("%s failed (DISPLAY=%s): %v (%s)", tool, os.Getenv("DISPLAY"), err, errOut.String())
+	}
+	if tool == "gnome-screenshot" || tool == "scrot" {
+		data, err := os.ReadFile("/tmp/pam_frame.jpg")
+		_ = os.Remove("/tmp/pam_frame.jpg")
+		return data, err
 	}
 	if out.Len() == 0 {
 		return nil, fmt.Errorf("%s produced no output", tool)
@@ -62,25 +85,59 @@ func toolAvailable(tool string) bool {
 	return err == nil
 }
 
-func (c *execCapture) Probe() error {
-	switch {
-	case toolAvailable("grim"):
+func (c *execCapture) probeTools() (bool, error) {
+	var lastErr error
+	if toolAvailable("gnome-screenshot") {
+		if _, err := runTool("gnome-screenshot", 50); err == nil {
+			c.tool = "gnome-screenshot"
+			log.Printf("capture backend: gnome-screenshot (GNOME Wayland/X11)")
+			return true, nil
+		} else {
+			lastErr = err
+		}
+	}
+	if toolAvailable("grim") {
 		if _, err := runTool("grim", 50); err == nil {
 			c.tool = "grim"
 			log.Printf("capture backend: grim (wlr-screencopy)")
-			return nil
+			return true, nil
+		} else {
+			lastErr = err
 		}
-		fallthrough
-	case toolAvailable("import"):
+	}
+	if toolAvailable("scrot") {
+		if _, err := runTool("scrot", 50); err == nil {
+			c.tool = "scrot"
+			log.Printf("capture backend: scrot (X11)")
+			return true, nil
+		} else {
+			lastErr = err
+		}
+	}
+	if toolAvailable("import") {
 		if _, err := runTool("import", 50); err == nil {
 			c.tool = "import"
 			log.Printf("capture backend: import (X11, ImageMagick)")
-			return nil
+			return true, nil
+		} else {
+			lastErr = err
 		}
-		return fmt.Errorf("no capture backend available — install grim (wlroots Wayland) or imagemagick (X11)")
-	default:
-		return fmt.Errorf("no capture backend available — install grim (wlroots Wayland) or imagemagick (X11)")
 	}
+	return false, lastErr
+}
+
+func (c *execCapture) Probe() error {
+	ok, err := c.probeTools()
+	if ok {
+		return nil
+	}
+	if err != nil {
+		log.Printf("probe error details: %v", err)
+	}
+	if !toolAvailable("gnome-screenshot") && !toolAvailable("import") && !toolAvailable("grim") && !toolAvailable("scrot") {
+		return fmt.Errorf("missing Linux desktop streaming dependencies!\n\nPlease install required packages on Linux:\n  Ubuntu/Debian: sudo apt-get update && sudo apt-get install -y gnome-screenshot xdotool\n  Fedora/RHEL:   sudo dnf install -y gnome-screenshot xdotool\n  Arch Linux:    sudo pacman -S gnome-screenshot xdotool")
+	}
+	return fmt.Errorf("screen capture tool failed: %v — ensure a desktop GUI session is running (DISPLAY=%s)", err, os.Getenv("DISPLAY"))
 }
 
 func (c *execCapture) Open() error {
@@ -121,7 +178,7 @@ type xdotoolInput struct {
 
 func (x *xdotoolInput) Open() error {
 	if !toolAvailable("xdotool") {
-		return fmt.Errorf("xdotool not installed — input injection disabled (capture still works)")
+		return fmt.Errorf("xdotool not installed — run: sudo apt-get install -y xdotool")
 	}
 	return nil
 }
