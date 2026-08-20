@@ -1,3 +1,5 @@
+from urllib.parse import quote
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
@@ -6,19 +8,22 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "change-me-in-production"
     DEBUG: bool = False
     
-    POSTGRES_USER: str
-    POSTGRES_PASSWORD: str
+    POSTGRES_USER: str = "pam_admin"
+    POSTGRES_PASSWORD: str = "admin@123"
     POSTGRES_SERVER: str = "localhost"
-    POSTGRES_PORT: str = "5432"
+    POSTGRES_PORT: str = "5433"
     POSTGRES_DB: str = "pam_db"
     
     REDIS_HOST: str = "localhost"
-    REDIS_PORT: str = "6379"
+    REDIS_PORT: str = "6380"
     REDIS_DB: int = 0
     
     @property
     def DATABASE_URL(self) -> str:
-        return f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+        return (
+            f"postgresql+asyncpg://{quote(self.POSTGRES_USER, safe='')}:"
+            f"{quote(self.POSTGRES_PASSWORD, safe='')}@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+        )
 
     @property
     def REDIS_URL(self) -> str:

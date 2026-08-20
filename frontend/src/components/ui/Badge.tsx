@@ -18,6 +18,7 @@ const TONE: Record<BadgeTone, string> = {
 export const HOST_STATUS_TONE: Record<HostStatus, BadgeTone> = {
   online: "online",
   offline: "offline",
+  busy: "pending",
 };
 
 export const SESSION_STATUS_TONE: Record<SessionStatus, BadgeTone> = {
