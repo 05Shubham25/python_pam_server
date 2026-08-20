@@ -1,19 +1,19 @@
 # PAM Server — Privileged Access Management Control Plane
 
-A self-hosted remote access platform that lets you manage, monitor, and connect to any machine through a browser — terminal sessions and full desktop streaming, with no VPN required.
+A self-hosted remote access platform that lets you manage, monitor, and connect to any machine through a browser — real terminal sessions and live remote desktop streaming, with no VPN required.
 
 ---
 
-## What It Does
+## Features
 
 | Feature | Details |
 |---|---|
-| 🖥️ **Remote Terminal** | Real PTY on Linux/macOS, pipe-based shell on Windows |
-| 🖱️ **Desktop Streaming** | Live JPEG screen stream + full mouse & keyboard injection |
-| 🔌 **WebSocket Broker** | Real-time binary protocol between the browser and agent |
-| 🤖 **Lightweight Agent** | Single Python file deployed on the target machine |
-| 🔐 **Auth** | JWT-based API authentication |
-| 📦 **PostgreSQL + Redis** | Persistent host/session storage + real-time message brokering |
+| 🖥️ **Remote Terminal** | Real PTY on Linux/macOS, pipe-based interactive shell on Windows |
+| 🖱️ **Desktop Streaming** | High-performance JPEG screen streaming + real-time mouse & keyboard control |
+| 🔌 **WebSocket Broker** | Low-latency binary protocol connecting the web UI and target agents |
+| ⚡ **Go Client (`go_agent`)** | High-performance, zero-dependency Go agent for Windows, Linux, and macOS |
+| 🔐 **Authentication** | JWT-based secure API authentication |
+| 📦 **PostgreSQL + Redis** | Persistent storage for hosts/sessions + Redis Stream real-time brokering |
 
 ---
 
@@ -47,180 +47,193 @@ A self-hosted remote access platform that lets you manage, monitor, and connect 
                │  WebSocket (auto-reconnect)
                ▼
 ┌─────────────────────────────────────────────────────────┐
-│                  PAM Agent  (pam_agent.py)              │
+│                  Go Agent  (go_agent)                   │
 │                                                         │
-│   ShellProcess (PTY / pipes)   DesktopBackend           │
+│   ShellProcess (PTY / Pipes)   DesktopBackend           │
 │   TerminalWorker               DesktopWorker            │
 │                                                         │
-│   Screen capture backends (auto-selected):              │
-│     mss  →  X11 / XWayland / Windows / macOS           │
-│     grim →  Wayland wlr-screencopy  (sway / Hyprland)  │
-│     portal → xdg-desktop-portal + PipeWire (GNOME)     │
+│   Supported OS & Screen Capture Backends:               │
+│     Windows  → Win32 GDI API + SendInput API           │
+│     Linux    → gnome-screenshot / grim / scrot / import   │
+│     macOS    → screencapture + cliclick CLI             │
 └─────────────────────────────────────────────────────────┘
 ```
 
-### Frame Protocol (Binary WebSocket)
+### WebSocket Binary Protocol
 
-Each WebSocket message starts with a 1-byte tag:
+All communication between browser and agent uses binary WebSocket frames prefixed with a 1-byte header tag:
 
 | Tag | Meaning | Direction |
 |-----|---------|-----------|
-| `0x01` | Raw terminal bytes | Both ways |
-| `0x02` | JSON control message | Both ways |
-| `0x03` | Full-frame JPEG | Agent → Browser |
+| `0x01` | Raw terminal PTY bytes | Bidirectional |
+| `0x02` | JSON control messages (input events, resize, keepalive) | Bidirectional |
+| `0x03` | Full-frame JPEG screen capture | Agent → Browser |
 
 ---
 
 ## Project Structure
 
 ```
-pam-server/
-├── main.py                  # FastAPI app entry point
+python_pam_server/
+├── main.py                  # FastAPI server entry point
+├── init_db.py               # Database initialization script
 ├── requirements.txt         # Server Python dependencies
-├── docker-compose.yml       # PostgreSQL + Redis
-├── alembic/                 # DB migrations
+├── docker-compose.yml       # PostgreSQL 16 + Redis 7 services
 │
-├── app/
-│   ├── api/v1/endpoints/    # REST + WebSocket endpoints
-│   │   ├── auth.py          #   JWT login
-│   │   ├── hosts.py         #   Host registration & listing
-│   │   ├── sessions.py      #   Session management
-│   │   ├── agent.py         #   Agent registration
-│   │   └── broker_ws.py     #   WebSocket broker
-│   ├── broker/
-│   │   ├── manager.py       # Active connection registry
-│   │   └── streamer.py      # Redis stream relay
-│   ├── core/
-│   │   ├── config.py        # Settings (loaded from .env)
-│   │   ├── exceptions.py    # Custom HTTP exceptions
-│   │   └── monitor.py       # Request monitoring middleware
-│   ├── infrastructure/
-│   │   ├── database.py      # Async SQLAlchemy setup
-│   │   └── redis_client.py  # Redis connection
-│   ├── models/              # SQLAlchemy ORM models
-│   ├── schemas/             # Pydantic request/response schemas
+├── app/                     # FastAPI backend application
+│   ├── api/v1/endpoints/    # REST API & WebSocket endpoints
+│   ├── broker/              # Redis stream broker & connection manager
+│   ├── core/                # Application configuration & security
+│   ├── infrastructure/      # Async database & Redis clients
+│   ├── models/              # SQLAlchemy database ORM models
 │   └── services/            # Business logic layer
 │
-├── agent/
-│   ├── pam_agent.py         # Standalone agent (deploy on target)
-│   ├── wayland_capture.py   # Wayland portal/PipeWire capture
-│   └── requirements.txt     # Agent Python dependencies
+├── go_agent/                # High-performance Go agent (deploy on target)
+│   ├── main.go              # Agent CLI entrypoint & session supervisor
+│   ├── client.go            # REST & WebSocket client
+│   ├── terminal.go          # Interactive terminal session worker
+│   ├── desktop.go           # Remote desktop session worker
+│   ├── desktop_windows.go   # Win32 GDI screen capture
+│   ├── input_windows.go     # Win32 SendInput input injection
+│   ├── desktop_linux.go     # Linux Wayland / X11 screen capture
+│   ├── shell_unix.go        # POSIX PTY allocation
+│   └── shell_windows.go     # Windows Command Prompt pipe process
 │
-└── frontend/                # Next.js web UI
-    └── src/
+└── frontend/                # Next.js 14 web interface
 ```
 
 ---
 
-## How to Use
+## Getting Started & Installation
 
 ### Prerequisites
 
-- Python 3.11+
-- Node.js 18+ (for the frontend)
-- Docker & Docker Compose (for PostgreSQL + Redis)
+- **Python 3.11+**
+- **Node.js 18+** (for frontend)
+- **Docker & Docker Compose** (for PostgreSQL & Redis)
+- **Go 1.21+** (optional, only if compiling `go_agent` from source)
 
 ---
 
-### 1. Clone the repo
+### 1. Start Database & Cache (Docker)
 
-```bash
-git clone https://github.com/your-username/pam-server.git
-cd pam-server
-```
-
-### 2. Start the database and Redis
+Start PostgreSQL and Redis container services:
 
 ```bash
 docker compose up -d
 ```
 
-### 3. Set up the server
+---
+
+### 2. Set Up & Start Server (FastAPI)
 
 ```bash
-# Create and activate a virtual environment
+# 1. Create and activate a virtual environment
 python -m venv env
-source env/bin/activate        # Linux/macOS
-# env\Scripts\activate         # Windows
 
-# Install dependencies
+# On Linux/macOS:
+source env/bin/activate
+
+# On Windows (PowerShell):
+.\env\Scripts\Activate.ps1
+
+# 2. Install dependencies
 pip install -r requirements.txt
 
-# Copy and edit the environment file
-cp .env.example .env           # edit values if needed
-```
+# 3. Create .env configuration
+cp .env.example .env
 
-**`.env` variables:**
+# 4. Initialize database tables
+python init_db.py
 
-```env
-APP_NAME="PAM-Control-Plane"
-DEBUG=True
-API_V1_PREFIX="/api/v1"
-
-POSTGRES_USER=pam_admin
-POSTGRES_PASSWORD=super_secret_password
-POSTGRES_SERVER=localhost
-POSTGRES_PORT=5432
-POSTGRES_DB=pam_db
-
-REDIS_HOST=localhost
-REDIS_PORT=6379
-REDIS_DB=0
-```
-
-### 4. Run database migrations
-
-```bash
-alembic upgrade head
-```
-
-### 5. Start the server
-
-```bash
+# 5. Start the FastAPI server
 python main.py
-# Server runs at http://localhost:8000
-# API docs at  http://localhost:8000/docs
 ```
 
-### 6. Start the frontend
+The server runs at **`http://localhost:8000`**.  
+Interactive API docs are available at **`http://localhost:8000/docs`**.
+
+---
+
+### 3. Start Frontend (Next.js)
+
+In a new terminal window:
 
 ```bash
 cd frontend
 npm install
 npm run dev
-# UI runs at http://localhost:3000
 ```
+
+The Web UI runs at **`http://localhost:3000`**.
 
 ---
 
-### 7. Deploy the agent on a target machine
+### 4. Deploy & Run the Go Agent (`go_agent`)
 
-Copy `agent/pam_agent.py` (and `wayland_capture.py` on Linux) to the target machine.
+The agent runs on the target machine you want to access remotely.
 
-```bash
-# Install agent dependencies on the target machine
-pip install websockets mss Pillow pynput
+#### **A. Running on Windows Target Machine**
 
-# Run the agent (terminal-only)
-python pam_agent.py --server http://<your-server-ip>:8000 --agent-id agt_XXXX
+Download or build `pam-agent.exe` from `go_agent/` and run it from Command Prompt or PowerShell:
 
-# Run the agent with desktop streaming enabled
-python pam_agent.py --server http://<your-server-ip>:8000 --agent-id agt_XXXX
-
-# Disable desktop streaming (terminal only)
-python pam_agent.py --server http://<your-server-ip>:8000 --agent-id agt_XXXX --no-desktop
+```cmd
+pam-agent.exe --server http://<server-ip>:8000 --agent-id agt_XXXX
 ```
 
-#### Desktop capture backends (Linux)
+> **Tip:** Run Command Prompt **as Administrator** to enable elevated desktop control (Taskbar, Start Menu, System Tray).
 
-The agent picks the best available backend automatically:
+#### **B. Running on Linux Target Machine**
 
-| Environment | Backend used |
-|---|---|
-| X11 / XWayland | `mss` — instant, no setup |
-| Wayland + sway/Hyprland | `grim` — `sudo apt install grim` |
-| Wayland + GNOME | xdg-desktop-portal — one-time consent dialog |
-| Windows / macOS | `mss` — instant, no setup |
+1. Install required desktop dependencies on the Linux machine:
+
+```bash
+# Ubuntu / Debian
+sudo apt-get update && sudo apt-get install -y gnome-screenshot xdotool
+
+# Fedora / RHEL
+sudo dnf install -y gnome-screenshot xdotool
+
+# Arch Linux
+sudo pacman -S gnome-screenshot xdotool
+```
+
+2. Transfer and run `pam-agent-linux-amd64`:
+
+```bash
+chmod +x pam-agent-linux-amd64
+
+./pam-agent-linux-amd64 --server http://<server-ip>:8000 --agent-id agt_XXXX
+```
+
+#### **C. Compiling Go Agent Binaries from Source**
+
+You can cross-compile Go agent binaries for any platform directly from `go_agent/`:
+
+```powershell
+cd go_agent
+
+# Build Windows 64-bit binary (.exe)
+go build -o pam-agent.exe .
+
+# Cross-compile for Linux 64-bit (x86_64)
+$env:GOOS="linux"; $env:GOARCH="amd64"; go build -o pam-agent-linux-amd64 .
+
+# Cross-compile for Linux ARM64 (Raspberry Pi / ARM servers)
+$env:GOOS="linux"; $env:GOARCH="arm64"; go build -o pam-agent-linux-arm64 .
+```
+
+#### **Agent CLI Options**
+
+| Flag | Default | Description |
+|---|---|---|
+| `--server` | *(Required)* | Server base URL (e.g., `http://192.168.1.35:8000`) |
+| `--agent-id` | *(Required)* | Registered agent ID matching a host entry |
+| `--max-sessions` | `5` | Maximum concurrent terminal/RDP sessions |
+| `--fps` | `10` | Frame rate cap for desktop capture (1-30) |
+| `--quality` | `60` | JPEG compression quality (30-90) |
+| `--no-desktop` | `false` | Disable remote desktop streaming (terminal only) |
+| `--no-terminal` | `false` | Disable interactive shell sessions |
 
 ---
 
@@ -228,16 +241,16 @@ The agent picks the best available backend automatically:
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `POST` | `/api/v1/auth/login` | Get a JWT token |
-| `GET` | `/api/v1/hosts` | List registered hosts |
-| `POST` | `/api/v1/hosts` | Register a new host |
-| `DELETE` | `/api/v1/hosts/{id}` | Remove a host |
-| `GET` | `/api/v1/sessions` | List sessions |
-| `POST` | `/api/v1/sessions` | Create a session |
-| `WS` | `/api/v1/ws/browser/{session_id}` | Browser WebSocket |
-| `WS` | `/api/v1/ws/agent/{agent_id}` | Agent WebSocket |
+| `POST` | `/api/v1/auth/login` | Authenticate user and get JWT |
+| `GET` | `/api/v1/hosts` | List all registered target hosts |
+| `POST` | `/api/v1/hosts` | Register a new target host |
+| `DELETE` | `/api/v1/hosts/{id}` | Delete a registered host |
+| `GET` | `/api/v1/sessions` | List active user sessions |
+| `POST` | `/api/v1/sessions` | Create a new terminal or RDP session |
+| `WS` | `/api/v1/ws/browser/{session_id}` | Browser UI WebSocket connection |
+| `WS` | `/api/v1/ws/agent/{agent_id}` | Go Agent WebSocket connection |
 
-Full interactive docs available at **`http://localhost:8000/docs`** when the server is running.
+Full interactive API documentation is available at **`http://localhost:8000/docs`**.
 
 ---
 
@@ -245,9 +258,9 @@ Full interactive docs available at **`http://localhost:8000/docs`** when the ser
 
 | Layer | Technology |
 |---|---|
-| Server | FastAPI, Python 3.11, Uvicorn |
-| Database | PostgreSQL 16, SQLAlchemy (async) |
-| Cache / Broker | Redis 7 |
-| Agent | Pure Python, `websockets`, `mss`, `pynput` |
-| Frontend | Next.js, TypeScript, Tailwind CSS |
-| Containerization | Docker Compose |
+| **Server** | FastAPI, Python 3.11, Uvicorn, Pydantic v2 |
+| **Database** | PostgreSQL 16, Async SQLAlchemy |
+| **Cache & Broker** | Redis 7 Streams |
+| **Agent** | Go 1.21+, Win32 GDI / SendInput, `gnome-screenshot` / `xdotool` |
+| **Frontend** | Next.js 14, TypeScript, Tailwind CSS, Lucide Icons |
+| **Containers** | Docker Compose |
